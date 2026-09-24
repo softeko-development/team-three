@@ -2,6 +2,43 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@/app/generated/prisma/client";
 import prisma from "@/lib/prisma";
 import { createPostZodSchema } from "@/zod/creatPostZodSchema";
+import slugify from "slugify";
+
+const createSlug = (value: string) =>
+  slugify(value, {
+    lower: true,
+    strict: true,
+    trim: true,
+  });
+
+const getUniqueSlug = async (preferredSlug: string) => {
+  const baseSlug = createSlug(preferredSlug);
+
+  const existingPosts = await prisma.post.findMany({
+    where: {
+      OR: [{ slug: baseSlug }, { slug: { startsWith: baseSlug + "-" } }],
+    },
+    select: {
+      slug: true,
+    },
+  });
+
+  const existingSlugs = new Set(existingPosts.map((post) => post.slug));
+
+  if (!existingSlugs.has(baseSlug)) {
+    return baseSlug;
+  }
+
+  let suffix = 2;
+  let nextSlug = baseSlug + "-" + suffix;
+
+  while (existingSlugs.has(nextSlug)) {
+    suffix += 1;
+    nextSlug = baseSlug + "-" + suffix;
+  }
+
+  return nextSlug;
+};
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -28,8 +65,13 @@ export async function POST(request: Request) {
   }
 
   try {
+    const slug = await getUniqueSlug(validation.data.slug);
+
     const post = await prisma.post.create({
-      data: validation.data,
+      data: {
+        ...validation.data,
+        slug,
+      },
     });
 
     return NextResponse.json(
@@ -42,7 +84,7 @@ export async function POST(request: Request) {
       error.code === "P2002"
     ) {
       return NextResponse.json(
-        { message: "A post with this slug already exists" },
+        { message: "Please try again. This slug was just used." },
         { status: 409 },
       );
     }
