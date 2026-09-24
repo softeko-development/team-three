@@ -20,6 +20,7 @@
     "react-hook-form": "^7.88.0",
     "react-toastify": "^11.1.0",
     "slugify": "^1.6.9",
+    "sweetalert2": "^11.26.25",
     "zod": "^4.6.5"
   },
   "devDependencies": {
